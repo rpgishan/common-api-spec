@@ -1,0 +1,67 @@
+plugins {
+    id 'java'
+    id 'maven-publish'
+    id 'org.openapi.generator' version '7.1.0'
+}
+
+group = 'com.sundance.apispecs'
+version = '0.0.1-SNAPSHOT'
+String apiSpecName = rootProject.name
+
+configurations {
+    apisource
+}
+
+repositories {
+    mavenLocal()
+    mavenCentral()
+}
+
+dependencies {
+
+}
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            from components.java
+            artifact source: "$buildDir/generated/src/main/resources/openapi.yaml", classifier: 'openapi', extension: 'yaml'
+        }
+    }
+}
+
+openApiGenerate {
+    generatorName.set("spring")
+    inputSpec.set("$buildDir/api-specs/${apiSpecName}.yaml")
+    outputDir.set("$buildDir/generated")
+    groupId.set("$group")
+    id.set(apiSpecName)
+    version.set("$version")
+}
+
+tasks.register('extractApi', Sync) {
+    dependsOn configurations.apisource
+    from {
+        configurations.apisource
+    }
+    into "$buildDir/api-specs/"
+    rename { String fileName ->
+        fileName.replaceAll("(?!\\.)([-.]?)(\\d+(\\.\\d+)+)(?:[-.][A-Z]+)?(?![\\d.])(?:[-.][a-z]+)?", "")
+    }
+}
+
+tasks.register('copyApiSpecs', Copy) {
+    dependsOn(tasks.extractApi)
+    from('src') {
+        include '*.yaml'
+    }
+    destinationDir(new File("$buildDir/api-specs/"))
+}
+
+tasks.openApiGenerate {
+    dependsOn(tasks.copyApiSpecs)
+}
+
+tasks.compileJava {
+    dependsOn(tasks.openApiGenerate)
+}
